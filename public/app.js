@@ -624,4 +624,8 @@ addEventListener('hashchange', () => {
   if (id === (state.chat?.id || '')) return;
   if (id && state.chats.some((c) => c.id === id)) openChat(id); else newChat();
 });
+// Service worker is required for Chrome (Android) to offer a standalone install.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
 init();
