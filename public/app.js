@@ -263,9 +263,8 @@ function fillMsg(el, m, streaming) {
   const status = streaming ? (m.status || (m.text ? '' : m.reasoning ? '思考中…' : '等待响应…')) : '';
   const extra = [];
   if (m.duration && !streaming) extra.push(`${(m.duration / 1000).toFixed(1)}s`);
-  const u = m.usage; if (u && !streaming) {
-    const out = u.output_tokens ?? u.completion_tokens; if (out) extra.push(`${out} tokens`);
-  }
+  const su = !streaming ? usageStats(m.usage) : null;
+  if (su) extra.push(`缓存命中 ${su.hit.toLocaleString()}`, `缓存未命中 ${su.miss.toLocaleString()}`, `输出 ${su.out.toLocaleString()} tokens`);
   el.innerHTML = `<div class="meta">${esc(m.model || '')}${extra.length ? ` · ${extra.join(' · ')}` : ''}</div>
     <div class="bubble">
       ${m.reasoning ? `<details class="reasoning"${open ? ' open' : ''}><summary>${streaming && !m.text ? '思考中…' : '思考过程'}</summary><div class="r-body"></div></details>` : ''}
@@ -278,6 +277,26 @@ function fillMsg(el, m, streaming) {
     ${streaming ? '' : `<div class="actions"><button data-a="copy">复制</button>${isLast ? '<button data-a="regen">重新生成</button>' : ''}<button data-a="del">删除</button></div>`}`;
   if (m.reasoning) el.querySelector('.r-body').textContent = m.reasoning;
   renderMarkdown(el.querySelector('.md'), m.text, !streaming);
+}
+// Normalize upstream usage into { hit, miss, out } (cache hit / cache miss / output tokens).
+// Anthropic: input_tokens excludes cache reads, so miss = input + cache writes.
+// OpenAI Chat / Responses: prompt (input) tokens include cached ones; miss = input - cached.
+// DeepSeek-style gateways report prompt_cache_hit/miss_tokens directly.
+function usageStats(u) {
+  if (!u) return null;
+  const n = (v) => (Number.isFinite(v) ? v : 0);
+  let hit, miss;
+  if (u.cache_read_input_tokens !== undefined || u.cache_creation_input_tokens !== undefined) {
+    hit = n(u.cache_read_input_tokens);
+    miss = n(u.input_tokens) + n(u.cache_creation_input_tokens);
+  } else if (u.prompt_cache_hit_tokens !== undefined || u.prompt_cache_miss_tokens !== undefined) {
+    hit = n(u.prompt_cache_hit_tokens);
+    miss = n(u.prompt_cache_miss_tokens);
+  } else {
+    hit = n(u.prompt_tokens_details?.cached_tokens ?? u.input_tokens_details?.cached_tokens);
+    miss = Math.max(0, n(u.prompt_tokens ?? u.input_tokens) - hit);
+  }
+  return { hit, miss, out: n(u.output_tokens ?? u.completion_tokens) };
 }
 const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; } };
 
