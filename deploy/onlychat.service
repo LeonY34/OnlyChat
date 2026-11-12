@@ -1,0 +1,29 @@
+[Unit]
+Description=OnlyChat
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=onlychat
+WorkingDirectory=/opt/onlychat/app
+Environment=HOST=127.0.0.1
+Environment=PORT=8081
+Environment=DATA_DIR=/var/lib/onlychat
+Environment="NODE_OPTIONS=--dns-result-order=ipv4first --use-openssl-ca --max-old-space-size=96"
+Environment=SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+# Optional: ONLYCHAT_PASSWORD=..., HTTPS_PROXY=... with NODE_USE_ENV_PROXY=1
+EnvironmentFile=-/etc/onlychat.env
+ExecStart=/opt/onlychat/node /opt/onlychat/app/server.js
+Restart=on-failure
+RestartSec=3
+MemoryMax=200M
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+StateDirectory=onlychat
+ReadWritePaths=/var/lib/onlychat
+
+[Install]
+WantedBy=multi-user.target

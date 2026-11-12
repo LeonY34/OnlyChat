@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18181b" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>OnlyChat</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="vendor/hl-light.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="vendor/hl-dark.css" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <div class="side-head">
+      <button id="newChat" class="btn primary wide">＋ 新对话</button>
+    </div>
+    <input id="search" class="input" placeholder="搜索会话…" autocomplete="off">
+    <nav id="chatList"></nav>
+    <div class="side-foot">
+      <button id="openSettings" class="btn ghost wide">⚙ 设置</button>
+    </div>
+  </aside>
+  <div id="scrim"></div>
+  <main id="main">
+    <header id="topbar">
+      <button id="toggleSide" class="icon-btn" title="会话列表">☰</button>
+      <select id="modelSelect" class="input" title="模型"></select>
+      <div class="top-spacer"></div>
+      <div id="chatTitle"></div>
+    </header>
+    <section id="messages"></section>
+    <footer id="composer">
+      <div id="editingBar" hidden><span>正在编辑消息，发送后将替换该消息及其后的内容</span><button id="cancelEdit" class="link">取消</button></div>
+      <div id="attachments"></div>
+      <div class="composer-box">
+        <textarea id="input" rows="1" placeholder="输入消息，Enter 发送，Shift+Enter 换行；可粘贴/拖入图片"></textarea>
+        <div class="composer-row">
+          <button id="attachBtn" class="chip" title="上传图片">🖼 图片</button>
+          <button id="searchToggle" class="chip toggle" title="使用 API 原生联网搜索">🌐 联网</button>
+          <button id="thinkToggle" class="chip toggle" title="开启推理/思考">💡 思考</button>
+          <div class="top-spacer"></div>
+          <button id="sendBtn" class="btn primary">发送</button>
+        </div>
+      </div>
+      <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+    </footer>
+  </main>
+</div>
+
+<dialog id="settingsDlg">
+  <form method="dialog" id="settingsForm">
+    <div class="dlg-head"><h2>设置</h2><button class="icon-btn" value="cancel" formnovalidate>✕</button></div>
+    <div class="dlg-body">
+      <h3>API 供应商</h3>
+      <div id="providerList"></div>
+      <div class="row-gap">
+        <button type="button" class="btn" data-add="openai">＋ OpenAI 格式</button>
+        <button type="button" class="btn" data-add="anthropic">＋ Anthropic 格式</button>
+      </div>
+      <h3>通用</h3>
+      <label class="field"><span>标题生成模型</span><select id="titleModel" class="input"></select></label>
+      <label class="field"><span>系统提示词</span><textarea id="systemPrompt" class="input" rows="3" placeholder="可留空"></textarea></label>
+      <label class="field"><span>max_tokens（Anthropic 必填）</span><input id="maxTokens" class="input" type="number" min="256" max="200000"></label>
+    </div>
+    <div class="dlg-foot"><span id="settingsMsg" class="muted"></span><button class="btn" value="cancel" formnovalidate>取消</button><button id="saveSettings" class="btn primary" value="save">保存</button></div>
+  </form>
+</dialog>
+
+<dialog id="loginDlg">
+  <form id="loginForm">
+    <div class="dlg-head"><h2>OnlyChat</h2></div>
+    <div class="dlg-body">
+      <label class="field"><span>访问密码</span><input id="password" class="input" type="password" autocomplete="current-password" required></label>
+      <div id="loginMsg" class="err"></div>
+    </div>
+    <div class="dlg-foot"><button class="btn primary">登录</button></div>
+  </form>
+</dialog>
+
+<template id="providerTpl">
+  <div class="provider">
+    <div class="prov-row">
+      <input class="input p-name" placeholder="名称">
+      <select class="input p-type">
+        <option value="openai">OpenAI · Chat Completions</option>
+        <option value="openai-responses">OpenAI · Responses</option>
+        <option value="anthropic">Anthropic · Messages</option>
+      </select>
+      <button type="button" class="icon-btn p-del" title="删除">🗑</button>
+    </div>
+    <input class="input p-base" placeholder="Base URL">
+    <input class="input p-key" type="password" autocomplete="off" placeholder="API Key">
+    <div class="prov-row">
+      <textarea class="input p-models" rows="3" placeholder="模型 ID，每行一个"></textarea>
+      <button type="button" class="btn p-fetch">拉取模型</button>
+    </div>
+    <details>
+      <summary>高级：自定义请求参数</summary>
+      <label class="field"><span>附加请求体 JSON（每次请求合并）</span><textarea class="input mono p-extra" rows="2" placeholder='{"top_p": 0.9}'></textarea></label>
+      <label class="field"><span>联网时附加的请求体 JSON（覆盖默认联网参数）</span><textarea class="input mono p-search" rows="2"></textarea></label>
+      <p class="muted small p-hint"></p>
+    </details>
+  </div>
+</template>
+
+<script src="vendor/marked.min.js"></script>
+<script src="vendor/purify.min.js"></script>
+<script src="vendor/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

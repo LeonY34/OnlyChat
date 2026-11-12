@@ -1,0 +1,9 @@
+{
+  "name": "onlychat",
+  "version": "0.1.0",
+  "description": "A tiny self-hosted chat UI for OpenAI / Anthropic compatible APIs. Zero dependencies.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=20" },
+  "license": "MIT"
+}
