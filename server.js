@@ -6,6 +6,7 @@ const fsp = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { streamChat, listModels } = require('./lib/providers');
+const { levelsFor, ALL_EFFORTS, effortRulesForClient } = require('./lib/efforts');
 
 const PORT = Number(process.env.PORT) || 8080;
 const HOST = process.env.HOST || '127.0.0.1';
@@ -52,6 +53,7 @@ const saveSettings = () => writeJSON(SETTINGS_FILE, settings);
 function publicSettings() {
   return {
     ...settings,
+    effortRules: effortRulesForClient(),
     providers: settings.providers.map(({ apiKey, ...p }) => ({ ...p, keyHint: apiKey ? `••••${apiKey.slice(-4)}` : '' })),
   };
 }
@@ -71,6 +73,11 @@ function cleanProvider(p, old) {
 }
 
 // ---------------- chats ----------------
+const EFFORTS = ALL_EFFORTS;
+// Effort must be one the chat's model supports, otherwise it falls back to off.
+const resolveEffort = (model, e) => (levelsFor(model).includes(e) ? e : 'off');
+// Old chats only have the boolean `thinking`; true meant on, and high exists on every model.
+const chatEffort = (c) => resolveEffort(c.model, c.effort ?? (c.thinking ? 'high' : 'off'));
 const index = new Map(); // id -> meta
 const live = new Map(); // id -> { chat, ac } while generating
 
@@ -239,7 +246,7 @@ async function handleSend(req, res, chat, body) {
       system: settings.systemPrompt,
       messages: await toUpstreamMessages(history),
       webSearch: !!chat.webSearch,
-      thinking: !!chat.thinking,
+      effort: chatEffort(chat),
       maxTokens: settings.maxTokens,
       signal: ac.signal,
       emit: (ev) => {
@@ -364,7 +371,7 @@ async function route(req, res) {
     const chat = {
       id: uid(), title: '新对话', titleGenerated: false, createdAt: now, updatedAt: now,
       providerId: String(b.providerId || ''), model: String(b.model || ''),
-      webSearch: !!b.webSearch, thinking: !!b.thinking, messages: [],
+      webSearch: !!b.webSearch, effort: EFFORTS.includes(b.effort) ? b.effort : 'off', messages: [],
     };
     await saveChat(chat);
     return sendJSON(res, 200, chat);
@@ -380,7 +387,7 @@ async function route(req, res) {
       if (typeof b.providerId === 'string') chat.providerId = b.providerId;
       if (typeof b.model === 'string') chat.model = b.model;
       if (typeof b.webSearch === 'boolean') chat.webSearch = b.webSearch;
-      if (typeof b.thinking === 'boolean') chat.thinking = b.thinking;
+      if (EFFORTS.includes(b.effort)) chat.effort = b.effort;
       if (typeof b.pinned === 'boolean') chat.pinned = b.pinned;
       if (typeof b.deleteMessage === 'string' && !live.has(chat.id)) chat.messages = chat.messages.filter((x) => x.id !== b.deleteMessage);
       await saveChat(chat);

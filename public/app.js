@@ -13,13 +13,13 @@ const state = {
   streams: new Map(), // chatId -> chat object being streamed in this tab
   attachments: [], // { key, url, file|null }
   editing: null,
-  opts: lsGet('oc_opts', { webSearch: false, thinking: false }),
+  opts: lsGet('oc_opts', { webSearch: false, effort: 'off' }),
 };
 
 const els = {
   app: $('#app'), list: $('#chatList'), search: $('#search'), messages: $('#messages'), input: $('#input'),
   send: $('#sendBtn'), model: $('#modelSelect'), title: $('#chatTitle'), att: $('#attachments'),
-  searchT: $('#searchToggle'), thinkT: $('#thinkToggle'), file: $('#fileInput'), editingBar: $('#editingBar'),
+  searchT: $('#searchToggle'), thinkT: $('#thinkSelect'), file: $('#fileInput'), editingBar: $('#editingBar'),
 };
 
 // ---------------- markdown ----------------
@@ -98,16 +98,38 @@ els.model.onchange = async () => {
   if (!s) return;
   if (state.chat) { Object.assign(state.chat, s); api('PATCH', `/api/chats/${state.chat.id}`, s).catch(alertErr); }
   state.settings.defaultModel = s;
+  renderToggles();
   api('PUT', '/api/settings', { defaultModel: s }).catch(() => {});
 };
 
 // ---------------- toggles ----------------
+// Effort levels depend on the model: the server sends the same rules (state.settings.effortRules).
+const LEVEL_LABEL = { off: '关', low: '低', medium: '中', high: '高', xhigh: '超高', max: '最大' };
+function effortLevels(model) {
+  const r = (state.settings.effortRules || []).find((x) => new RegExp(x.match, x.flags).test(model || ''));
+  return r ? r.levels : ['off', 'low', 'medium', 'high'];
+}
 function renderToggles() {
   const src = state.chat || state.opts;
   els.searchT.classList.toggle('on', !!src.webSearch);
-  els.thinkT.classList.toggle('on', !!src.thinking);
+  const levels = effortLevels(currentSel()?.model);
+  const raw = src.effort ?? (src.thinking ? 'high' : 'off');
+  const eff = levels.includes(raw) ? raw : 'off'; // unsupported by this model -> off
+  const key = levels.join();
+  if (els.thinkT.dataset.levels !== key) {
+    els.thinkT.innerHTML = levels.map((l) => `<option value="${l}">💡 思考：${LEVEL_LABEL[l]}</option>`).join('');
+    els.thinkT.dataset.levels = key;
+  }
+  els.thinkT.value = eff;
+  els.thinkT.classList.toggle('on', eff !== 'off');
 }
-for (const [btn, key] of [[els.searchT, 'webSearch'], [els.thinkT, 'thinking']]) {
+els.thinkT.onchange = () => {
+  const v = els.thinkT.value;
+  state.opts.effort = v; lsSet('oc_opts', state.opts);
+  if (state.chat) { state.chat.effort = v; api('PATCH', `/api/chats/${state.chat.id}`, { effort: v }).catch(alertErr); }
+  renderToggles();
+};
+for (const [btn, key] of [[els.searchT, 'webSearch']]) {
   btn.onclick = () => {
     const v = !(state.chat || state.opts)[key];
     state.opts[key] = v; lsSet('oc_opts', state.opts);
@@ -324,7 +346,7 @@ async function send() {
   if (!sel) return openSettings();
   let chat = state.chat;
   if (!chat) {
-    try { chat = await api('POST', '/api/chats', { ...sel, webSearch: !!state.opts.webSearch, thinking: !!state.opts.thinking }); } catch (e) { return alertErr(e); }
+    try { chat = await api('POST', '/api/chats', { ...sel, webSearch: !!state.opts.webSearch, effort: state.opts.effort || 'off' }); } catch (e) { return alertErr(e); }
     state.chat = chat; upsertMeta(chat); setHash(chat.id);
   }
   if (chat.generating) return;
