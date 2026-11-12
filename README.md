@@ -33,6 +33,7 @@ Environment variables:
 | `HOST` / `PORT` | `127.0.0.1` / `8080` | Listen address |
 | `DATA_DIR` | `./data` | Where chats, images, and settings (including API keys) are stored |
 | `ONLYCHAT_PASSWORD` | empty | If set, the UI asks for a password |
+| `CANONICAL_URL` | empty | e.g. `https://host.tailnet.ts.net`. Requests that use a short hostname (such as `http://host`) are 301-redirected to this address |
 | `NODE_USE_ENV_PROXY=1` + `HTTPS_PROXY` | - | Node 24+ sends upstream requests through this proxy |
 
 Open the UI, then go to **Settings** and add a provider (Base URL, API key, models). Models can be listed from `/models` or entered by hand.

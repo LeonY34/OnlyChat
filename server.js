@@ -11,6 +11,7 @@ const PORT = Number(process.env.PORT) || 8080;
 const HOST = process.env.HOST || '127.0.0.1';
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
 const PASSWORD = process.env.ONLYCHAT_PASSWORD || '';
+const CANONICAL_URL = (process.env.CANONICAL_URL || '').replace(/\/+$/, '');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const CHAT_DIR = path.join(DATA_DIR, 'chats');
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
@@ -279,6 +280,14 @@ async function handleSend(req, res, chat, body) {
 
 // ---------------- router ----------------
 async function route(req, res) {
+  // Short-name access (e.g. http://myhost via MagicDNS) → redirect to the canonical HTTPS URL.
+  if (CANONICAL_URL) {
+    const host = String(req.headers.host || '').replace(/:\d+$/, '');
+    if (host && !host.includes('.') && !host.includes(':') && host !== 'localhost') {
+      res.writeHead(301, { location: CANONICAL_URL + req.url });
+      return res.end();
+    }
+  }
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
   const m = req.method;
