@@ -23,7 +23,11 @@
     <input id="search" class="input" placeholder="搜索会话…" autocomplete="off">
     <nav id="chatList"></nav>
     <div class="side-foot">
-      <button id="openSettings" class="btn ghost wide">⚙ 设置</button>
+      <button id="openAccount" class="btn ghost wide account-btn" title="账户"><span class="avatar" id="meAvatar">?</span><span id="meName" class="t">账户</span></button>
+      <div class="foot-row">
+        <button id="openSettings" class="btn ghost">⚙ 设置</button>
+        <button id="openUsage" class="btn ghost">📊 用量</button>
+      </div>
     </div>
   </aside>
   <div id="scrim"></div>
@@ -33,6 +37,7 @@
       <select id="modelSelect" class="input" title="模型"></select>
       <div class="top-spacer"></div>
       <div id="chatTitle"></div>
+      <a id="exportChat" class="icon-btn" title="导出当前会话（JSON）" hidden>⤓</a>
     </header>
     <section id="messages"></section>
     <footer id="composer">
@@ -57,11 +62,16 @@
   <form method="dialog" id="settingsForm">
     <div class="dlg-head"><h2>设置</h2><button class="icon-btn" value="cancel" formnovalidate>✕</button></div>
     <div class="dlg-body">
-      <h3>API 供应商</h3>
+      <h3>我的 API 供应商</h3>
       <div id="providerList"></div>
       <div class="row-gap">
         <button type="button" class="btn" data-add="openai">＋ OpenAI 格式</button>
         <button type="button" class="btn" data-add="anthropic">＋ Anthropic 格式</button>
+      </div>
+      <p class="muted small">已保存的供应商不能删除，只能「停用」（停止使用，不再出现在模型列表）并可随时「恢复」；是否共享只能在创建时选择，之后不可更改。</p>
+      <div id="sharedSec" hidden>
+        <h3>他人共享的供应商（只读）</h3>
+        <div id="sharedList"></div>
       </div>
       <h3>通用</h3>
       <label class="field"><span>标题生成模型</span><select id="titleModel" class="input"></select></label>
@@ -76,11 +86,58 @@
   <form id="loginForm">
     <div class="dlg-head"><h2>OnlyChat</h2></div>
     <div class="dlg-body">
-      <label class="field"><span>访问密码</span><input id="password" class="input" type="password" autocomplete="current-password" required></label>
+      <label class="field"><span>用户名</span><input id="loginUser" class="input" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+      <label class="field"><span>密码</span><input id="password" class="input" type="password" autocomplete="current-password" required></label>
       <div id="loginMsg" class="err"></div>
     </div>
     <div class="dlg-foot"><button class="btn primary">登录</button></div>
   </form>
+</dialog>
+
+<dialog id="accountDlg">
+  <div class="dlg-form">
+    <div class="dlg-head"><h2>账户</h2><button type="button" class="icon-btn" id="accClose">✕</button></div>
+    <div class="dlg-body">
+      <div class="acc-who"><span class="avatar big" id="accAvatar"></span><div><div id="accName" class="acc-name"></div><div id="accRole" class="muted small"></div></div><button type="button" id="logoutBtn" class="btn danger-o">退出登录</button></div>
+
+      <h3>修改密码</h3>
+      <form id="pwForm" autocomplete="off">
+        <input type="text" autocomplete="username" hidden>
+        <label class="field"><span>当前密码</span><input id="pwCur" class="input" type="password" autocomplete="current-password" required></label>
+        <label class="field"><span>新密码</span><input id="pwNew" class="input" type="password" autocomplete="new-password" required></label>
+        <label class="field"><span>确认新密码</span><input id="pwNew2" class="input" type="password" autocomplete="new-password" required></label>
+        <div class="row-gap"><button class="btn primary">修改密码</button><span id="pwMsg" class="small"></span></div>
+      </form>
+
+      <h3>数据</h3>
+      <div class="row-gap">
+        <a id="exportAll" class="btn" href="/api/export" download>导出我的全部会话</a>
+        <button type="button" id="importBtn" class="btn">导入会话…</button>
+        <input id="importFile" type="file" accept="application/json,.json" hidden>
+        <span id="dataMsg" class="small"></span>
+      </div>
+      <p class="muted small">导出为 JSON（含内嵌图片），导入使用同一格式；仅涉及你自己的会话。</p>
+
+      <div id="adminSec" hidden>
+        <h3>用户管理（管理员）</h3>
+        <div id="userList" class="user-list"></div>
+        <form id="newUserForm" class="new-user" autocomplete="off">
+          <input id="nuName" class="input" placeholder="新用户名" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+          <input id="nuPw" class="input" placeholder="密码（留空则随机生成）" autocomplete="new-password">
+          <button class="btn primary">创建用户</button>
+        </form>
+        <div id="nuResult" class="nu-result" hidden></div>
+        <div id="adminMsg" class="small"></div>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="usageDlg" class="wide">
+  <div class="dlg-form">
+    <div class="dlg-head"><h2>共享密钥用量排行</h2><button type="button" class="icon-btn" id="usageClose">✕</button></div>
+    <div class="dlg-body" id="usageBody"></div>
+  </div>
 </dialog>
 
 <template id="providerTpl">
@@ -92,10 +149,22 @@
         <option value="openai-responses">OpenAI · Responses</option>
         <option value="anthropic">Anthropic · Messages</option>
       </select>
-      <button type="button" class="icon-btn p-del" title="删除">🗑</button>
+      <button type="button" class="btn p-toggle" title="停用后不再出现在模型列表，数据保留，可随时恢复">停用</button>
+      <button type="button" class="icon-btn p-del" title="移除（尚未保存）">🗑</button>
+    </div>
+    <div class="prov-meta">
+      <span class="badge p-badge"></span>
+      <label class="p-share-pick">共享方式
+        <select class="input p-shared"><option value="0">仅自己使用</option><option value="1">共享给所有用户使用</option></select>
+      </label>
+      <span class="muted small p-share-note">创建后不可更改；共享后其他用户可使用此 Key 调用模型，用量会计入排行。</span>
     </div>
     <input class="input p-base" placeholder="Base URL">
-    <input class="input p-key" type="password" autocomplete="off" placeholder="API Key">
+    <div class="prov-row">
+      <input class="input p-key" type="password" autocomplete="off" placeholder="API Key">
+      <button type="button" class="btn p-reveal" title="仅你本人可查看">显示 Key</button>
+    </div>
+    <div class="prov-row p-secret-row" hidden><input class="input mono p-secret" readonly><button type="button" class="btn p-secret-hide">隐藏</button></div>
     <div class="prov-row">
       <textarea class="input p-models" rows="3" placeholder="模型 ID，每行一个"></textarea>
       <button type="button" class="btn p-fetch">拉取模型</button>

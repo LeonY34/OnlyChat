@@ -5,7 +5,7 @@
 set -euo pipefail
 HOST="${1:?usage: deploy.sh <ssh-host>}"
 cd "$(dirname "$0")/.."
-COPYFILE_DISABLE=1 tar --no-xattrs -czf - --exclude=.git --exclude=data --exclude=node_modules . | ssh "$HOST" 'set -e
+COPYFILE_DISABLE=1 tar --no-xattrs -czf - --exclude=.git --exclude=.claude --exclude=data --exclude=node_modules . | ssh "$HOST" 'set -e
   sudo id onlychat >/dev/null 2>&1 || sudo useradd --system --no-create-home --shell /usr/sbin/nologin onlychat
   sudo mkdir -p /opt/onlychat/app.new
   sudo tar xzf - -C /opt/onlychat/app.new

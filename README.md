@@ -18,7 +18,11 @@ A very small, self-hosted AI chat UI. **Zero npm dependencies**: one Node.js fil
 - Shows reasoning/thinking output (`reasoning_content`, Anthropic thinking summaries, Responses reasoning summaries); an optional "Thinking" toggle
 - Streaming output, stop, regenerate, editing a message and resending, delete, pin, rename, search
 - Generation continues on the server and is saved there even if the browser disconnects
-- Optional access password, mobile-friendly layout, automatic dark mode
+- **Multi-user accounts**: admins create users (with optional generated strong passwords) and promote users to admins. Admins cannot demote anyone or access another user's chats, attachments, private keys, or personal settings.
+- **Per-user API keys**: private or shared, chosen permanently at creation. Only the creator can view/edit the secret or stop/restore service; stopping keeps history. Shared keys are usable by all accounts, never exposed as plaintext to other users.
+- **Shared-key token leaderboard**: cached input, non-cached input (including cache writes), output and total, ranked by total with expandable per-user totals. Counts only calls through this installation, including automatic titles. Missing cache details are marked as unknown; upstream calls that supply no usage cannot be counted. Imported chats do not affect usage.
+- **Chat import/export**: portable OnlyChat JSON including images, either one chat or all your chats. Imports create fresh chats and image IDs in your own account, never overwrite existing chats. Import limit: 100MB per JSON file, 20MB per image.
+- Account login, mobile-friendly layout, automatic dark mode
 
 ## Running it
 
@@ -31,8 +35,8 @@ Environment variables:
 | Variable | Default | Description |
 | --- | --- | --- |
 | `HOST` / `PORT` | `127.0.0.1` / `8080` | Listen address |
-| `DATA_DIR` | `./data` | Where chats, images, and settings (including API keys) are stored |
-| `ONLYCHAT_PASSWORD` | empty | If set, the UI asks for a password |
+| `DATA_DIR` | `./data` | Private persistent data directory; back up the entire directory, especially `encryption.key` |
+| `ONLYCHAT_PASSWORD` | empty | Initial `admin` administrator password, used only on the first launch. If absent, a random password is printed to the server startup log. This variable does not reset existing account passwords. |
 | `CANONICAL_URL` | empty | e.g. `https://host.tailnet.ts.net`. Requests that use a short hostname (such as `http://host`) are 301-redirected to this address |
 | `NODE_USE_ENV_PROXY=1` + `HTTPS_PROXY` | - | Node 24+ sends upstream requests through this proxy |
 
@@ -51,7 +55,18 @@ The service expects a Node binary at `/opt/onlychat/node`. Data is stored in `/v
 ## Data layout
 
 ```
-data/settings.json        providers (including API keys), default model, title model, system prompt
-data/chats/<id>.json      one file per chat
-data/uploads/<id>.<ext>   uploaded images (deleted together with their chat)
+data/accounts.json                users, scrypt password hashes, sessions, encrypted keys, personal settings and cumulative usage
+ data/encryption.key               AES-256-GCM master key (0600; losing this makes API keys unrecoverable)
+ data/chats/<id>.json               chat with immutable owner ID
+ data/uploads/<user-id>/<id>.<ext>  user-isolated uploaded images
+```
+
+On the first upgrade from the single-user version, all old chats, images and settings are assigned to the initial admin **admin**. Existing API keys become **private** and are encrypted before the old plaintext `settings.json` is removed. Back up the data directory **before** upgrading. Old chat-message usage is retained in messages but is not retroactively attributed to the leaderboard (old records cannot reliably identify the key/user).
+
+New passwords require 14–256 characters and at least three of lowercase, uppercase, digits and symbols. Existing legacy passwords are accepted for migration; change yours in Account after upgrading. Password changes invalidate all sessions. Sessions are random, expire after 30 days, and are stored as hashes. Use HTTPS: cookies are Secure when `CANONICAL_URL` is HTTPS. Key encryption protects files at rest, not against the server's root/operator who can access the master key.
+
+Run regression tests (local mock upstream only, no billable calls):
+
+```bash
+node --test test/*.test.js
 ```
